@@ -1,5 +1,5 @@
 package technology.tabula.pattern;
 
-public class Table {
+public class Reader {
 
 }

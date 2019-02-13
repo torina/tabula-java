@@ -1,33 +1,22 @@
 package technology.tabula;
 
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FilenameFilter;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-
-import org.apache.commons.cli.CommandLine;
-import org.apache.commons.cli.CommandLineParser;
-import org.apache.commons.cli.HelpFormatter;
-import org.apache.commons.cli.Option;
-import org.apache.commons.cli.Options;
-import org.apache.commons.cli.ParseException;
-import org.apache.commons.cli.DefaultParser;
+import org.apache.commons.cli.*;
 import org.apache.pdfbox.pdmodel.PDDocument;
-
 import technology.tabula.detectors.DetectionAlgorithm;
 import technology.tabula.detectors.NurminenDetectionAlgorithm;
 import technology.tabula.extractors.BasicExtractionAlgorithm;
 import technology.tabula.extractors.SpreadsheetExtractionAlgorithm;
+import technology.tabula.pattern.FileProcessor;
+import technology.tabula.pattern.PatternProcessor;
 import technology.tabula.writers.CSVWriter;
 import technology.tabula.writers.JSONWriter;
 import technology.tabula.writers.TSVWriter;
 import technology.tabula.writers.Writer;
+
+import java.io.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 
 
 public class CommandLineApp {
@@ -41,6 +30,7 @@ public class CommandLineApp {
 
 
     private Appendable defaultOutput;
+    private FileProcessor fileProcessor;
     
     private List<Pair<Integer, Rectangle>> pageAreas;
     private List<Integer> pages;
@@ -54,6 +44,7 @@ public class CommandLineApp {
         this.pages = CommandLineApp.whichPages(line);
         this.outputFormat = CommandLineApp.whichOutputFormat(line);
         this.tableExtractor = CommandLineApp.createExtractor(line);
+        fileProcessor = new FileProcessor();
 
         if (line.hasOption('s')) {
             this.password = line.getOptionValue('s');
@@ -103,12 +94,15 @@ public class CommandLineApp {
         }
 
         File pdfFile = new File(line.getArgs()[0]);
+        String name = fileProcessor.readFileName(pdfFile);
         if (!pdfFile.exists()) {
             throw new ParseException("File does not exist");
         }
+
         extractFileTables(line, pdfFile);
     }
 
+    //todo process also directory
     public void extractDirectoryTables(CommandLine line, File pdfDirectory) throws ParseException {
         File[] pdfs = pdfDirectory.listFiles(new FilenameFilter() {
             public boolean accept(File dir, String name) {
@@ -154,7 +148,14 @@ public class CommandLineApp {
         }
     }
 
+    /**
+     * The extraction starts
+     * @param pdfFile
+     * @param outFile
+     * @throws ParseException
+     */
     private void extractFile(File pdfFile, Appendable outFile) throws ParseException {
+
         PDDocument pdfDocument = null;
         try {
             pdfDocument = this.password == null ? PDDocument.load(pdfFile) : PDDocument.load(pdfFile, this.password);
